@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<questionnaire>
+    <metadata>
+        <title>Consumer Electronics Brand Perception Survey 2024</title>
+        <conductor>MarketScope Research</conductor>
+        <client>TechVision Analytics</client>
+        <projectCode>MS-2024-0472</projectCode>
+    </metadata>
+    
+    <section name="demographics">
+        <question id="q1">
+            <text>Age Range:</text>
+            <options type="single">
+                <option>18-24</option>
+                <option>25-34</option>
+                <option>35-44</option>
+                <option>45-54</option>
+                <option>55+</option>
+            </options>
+        </question>
+        
+        <question id="q2">
+            <text>How often do you purchase new electronic devices?</text>
+            <options type="single">
+                <option>Every 6 months or less</option>
+                <option>Every 7-12 months</option>
+                <option>Every 1-2 years</option>
+                <option>Every 2+ years</option>
+            </options>
+        </question>
+    </section>
+
+    <section name="brand_awareness">
+        <question id="q3">
+            <text>Which of these smartphone brands have you owned? (Select all that apply)</text>
+            <options type="multiple">
+                <option>SkyPhone</option>
+                <option>Quantum Mobile</option>
+                <option>NexusWave</option>
+                <option>TechPro</option>
+                <option>Other (please specify)</option>
+            </options>
+        </question>
+
+        <question id="q4">
+            <text>Rate your satisfaction with TechPro's latest XR5000 smartphone:</text>
+            <options type="single">
+                <option>Very Satisfied</option>
+                <option>Somewhat Satisfied</option>
+                <option>Neutral</option>
+                <option>Somewhat Dissatisfied</option>
+                <option>Very Dissatisfied</option>
+            </options>
+        </question>
+
+        <question id="q5">
+            <text>How likely are you to recommend NexusWave products to friends or family?</text>
+            <options type="single">
+                <option>Extremely likely</option>
+                <option>Somewhat likely</option>
+                <option>Neither likely nor unlikely</option>
+                <option>Somewhat unlikely</option>
+                <option>Extremely unlikely</option>
+            </options>
+        </question>
+    </section>
+
+    <section name="smart_home">
+        <question id="q6">
+            <text>Which SmartLife Hub features do you use most frequently?</text>
+            <options type="single">
+                <option>Voice control</option>
+                <option>Home security</option>
+                <option>Climate control</option>
+                <option>Entertainment system</option>
+                <option>Lighting control</option>
+            </options>
+        </question>
+
+        <question id="q7">
+            <text>How satisfied are you with the integration between SkyPhone devices and the SmartLife ecosystem?</text>
+            <type>scale</type>
+            <range min="1" max="10"/>
+        </question>
+    </section>
+
+    <section name="future_products">
+        <question id="q8">
+            <text>Which upcoming Quantum Mobile product interests you most?</text>
+            <options type="single">
+                <option>QM Watch Pro</option>
+                <option>QM Fitness Band</option>
+                <option>QM Smart Glasses</option>
+                <option>QM Home Controller</option>
+            </options>
+        </question>
+
+        <question id="q9">
+            <text>What features would make you switch from your current TechPro device to a NexusWave device?</text>
+            <type>open_text</type>
+        </question>
+    </section>
+
+    <section name="brand_perception">
+        <question id="q10">
+            <text>Rank these brands in order of innovation (1 being most innovative):</text>
+            <options type="rank">
+                <option>SkyPhone</option>
+                <option>Quantum Mobile</option>
+                <option>NexusWave</option>
+                <option>TechPro</option>
+            </options>
+        </question>
+    </section>
+</questionnaire>
