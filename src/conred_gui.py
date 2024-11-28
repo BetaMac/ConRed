@@ -6,7 +6,7 @@ import json
 import threading
 from typing import List, Tuple, Dict
 import re
-from conred import ConRed  # Your existing ConRed class
+from conred import ConRed
 
 class ConRedGUI(ctk.CTk):
     def __init__(self):
@@ -19,6 +19,8 @@ class ConRedGUI(ctk.CTk):
         # Data storage
         self.document_pairs: List[Tuple[Path, Path]] = []
         self.replacements: Dict[str, str] = {}
+        self.current_pair = 0
+        self.total_pairs = 0
         
         self.create_gui()
 
@@ -86,13 +88,31 @@ class ConRedGUI(ctk.CTk):
         self.output_text = ctk.CTkTextbox(output_frame)
         self.output_text.pack(fill="both", expand=True, padx=5, pady=5)
 
+        # Status bar
+        status_frame = ctk.CTkFrame(self)
+        status_frame.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
+        
+        self.progress_bar = ctk.CTkProgressBar(status_frame)
+        self.progress_bar.pack(fill="x", padx=5, pady=2)
+        self.progress_bar.set(0)
+        
+        self.status_label = ctk.CTkLabel(status_frame, text="Ready")
+        self.status_label.pack(pady=2)
+
         # Process button
         self.process_btn = ctk.CTkButton(
             self, 
             text="Process Documents", 
             command=self.process_documents
         )
-        self.process_btn.grid(row=3, column=0, padx=10, pady=10)
+        self.process_btn.grid(row=4, column=0, padx=10, pady=10)
+
+    def update_status(self, message, progress=None):
+        """Update status bar with message and optional progress"""
+        self.status_label.configure(text=message)
+        if progress is not None:
+            self.progress_bar.set(progress)
+        self.update_idletasks()
 
     def add_document_pair(self):
         word_file = filedialog.askopenfilename(
@@ -113,10 +133,13 @@ class ConRedGUI(ctk.CTk):
             
         self.document_pairs.append((word_path, xml_path))
         self.update_document_list()
+        self.update_status(f"Added document pair: {word_path.name}")
 
     def clear_documents(self):
         self.document_pairs.clear()
         self.doc_list.delete("1.0", tk.END)
+        self.update_status("All documents cleared")
+        self.progress_bar.set(0)
 
     def add_replacement_rule(self):
         search = self.search_entry.get().strip()
@@ -131,6 +154,7 @@ class ConRedGUI(ctk.CTk):
             
         self.replacements[search] = replace
         self.update_rules_list()
+        self.update_status(f"Added replacement rule: '{search}' → '{replace}'")
         
         self.search_entry.delete(0, tk.END)
         self.replace_entry.delete(0, tk.END)
@@ -156,6 +180,8 @@ class ConRedGUI(ctk.CTk):
             
         self.process_btn.configure(state="disabled")
         self.output_text.delete("1.0", tk.END)
+        self.current_pair = 0
+        self.total_pairs = len(self.document_pairs)
         
         # Save replacement rules to temporary config
         config_path = Path('temp_config.json')
@@ -165,7 +191,14 @@ class ConRedGUI(ctk.CTk):
         def process():
             conred = ConRed(config_path)
             
-            for word_path, xml_path in self.document_pairs:
+            for i, (word_path, xml_path) in enumerate(self.document_pairs, 1):
+                self.current_pair = i
+                progress = i / self.total_pairs
+                self.update_status(
+                    f"Processing pair {i} of {self.total_pairs}: {word_path.name}",
+                    progress
+                )
+                
                 self.output_text.insert(tk.END, f"\nProcessing pair:\n{word_path}\n{xml_path}\n")
                 self.output_text.insert(tk.END, "-" * 50 + "\n")
                 
@@ -194,16 +227,16 @@ class ConRedGUI(ctk.CTk):
                     for word, count in results['word_counts'].items():
                         self.output_text.insert(tk.END, f"{word}: {count} replacements\n")
                     
-                    self.output_text.insert(tk.END, "\nProcessing complete!\n")
-                    
                 except Exception as e:
                     self.output_text.insert(tk.END, f"\nError processing documents: {str(e)}\n")
+                    self.update_status(f"Error processing {word_path.name}", progress)
                 
                 self.output_text.insert(tk.END, "\n" + "="*50 + "\n")
                 self.output_text.see(tk.END)
             
             config_path.unlink()  # Remove temporary config file
             self.process_btn.configure(state="normal")
+            self.update_status("Processing complete!", 1.0)
         
         # Run processing in a separate thread
         threading.Thread(target=process, daemon=True).start()
