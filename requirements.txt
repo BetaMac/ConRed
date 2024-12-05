@@ -1,3 +1,5 @@
 python-docx==1.1.0
 customtkinter==5.2.0
 pyinstaller==6.2.0
+markdown==3.5.1
+python-frontmatter==1.0.1
