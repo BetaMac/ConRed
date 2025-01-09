@@ -1,14 +1,16 @@
 # ConRed (Confidentiality Redactor)
 
-A GUI tool for batch processing document pairs (Word and XML) to replace sensitive information consistently across files.
+A GUI tool for batch processing documents (Word, XML, and Markdown) to replace sensitive information consistently across files.
 
 ## Features
 
 - Process multiple DOCX/XML document pairs simultaneously
+- Markdown conversion and processing support
 - Case-insensitive search and replace
 - Consistency checking between document pairs
 - Detailed logging of all replacements
 - GUI interface for easy operation
+- Rule management (load/save replacement rules)
 
 ## Installation
 
@@ -58,8 +60,12 @@ ConRed/
 
 ## License
 
-[Add your chosen license]
+MIT License
 
 ## Contributing
 
-[Add contribution guidelines if needed]
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
