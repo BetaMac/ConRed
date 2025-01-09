@@ -20,6 +20,11 @@ class ConRed:
         # Setup logging
         log_dir = Path('logs')
         log_dir.mkdir(exist_ok=True)
+        
+        # Ensure output directory exists
+        output_dir = Path('data/output')
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
         logging.basicConfig(
             filename=log_dir / f'conred_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log',
             level=logging.INFO,

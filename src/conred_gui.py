@@ -196,6 +196,9 @@ class ConRedGUI(ctk.CTk):
             messagebox.showwarning("Warning", "No replacement rules defined")
             return
             
+        # Clear previous output
+        self.output_text.delete("1.0", tk.END)
+        
         # Create ConRed instance with current rules
         processor = ConRed()
         processor.replacement_dict = self.replacements
@@ -217,7 +220,14 @@ class ConRedGUI(ctk.CTk):
                 output_xml = Path('data/output') / xml_path.name
                 with open(output_xml, 'w', encoding='utf-8') as f:
                     f.write(xml_content)
-                    
+                
+                # Show replacement counts in output
+                self.output_text.insert(tk.END, f"\nProcessed {word_path.name}:\n")
+                for term, count in processor.replacement_counts['word'].items():
+                    self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in Word doc\n")
+                for term, count in processor.replacement_counts['xml'].items():
+                    self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in XML\n")
+                
                 processed += 1
                 self.update_status(
                     f"Processed {processed}/{total_pairs} pairs", 

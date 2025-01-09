@@ -1,9 +1,8 @@
-import mammoth
-from pathlib import Path
-import logging
-from typing import Dict, Tuple
-from collections import Counter
 import re
+from collections import Counter
+from typing import Dict, Tuple
+import mammoth
+import logging
 
 class MarkdownConverter:
     """
@@ -16,6 +15,36 @@ class MarkdownConverter:
     def __init__(self):
         """Initialize the markdown converter with a counter for replacements"""
         self.replacement_counts = Counter()
+        self.replacement_dict = {}
+
+    def set_replacement_dict(self, replacement_dict: Dict[str, str]):
+        """Set the replacement dictionary for text processing"""
+        self.replacement_dict = replacement_dict
+
+    def replace_text(self, text: str) -> Tuple[str, Counter]:
+        """Perform replacements using the same logic as ConRed"""
+        counts = Counter()
+        modified_text = text
+        
+        for original, replacement in self.replacement_dict.items():
+            patterns = [
+                r'\b' + re.escape(original) + r'\b',
+                r'\b' + re.escape(original).replace('.', r'\.').replace('-', r'\-') + r'\b',
+                r'(?<=__)\s*' + re.escape(original) + r'\s*(?=__)',
+                r'(?<=\*\*)\s*' + re.escape(original) + r'\s*(?=\*\*)',
+                r'(?<=- )' + re.escape(original),
+                r'(?<=\* )' + re.escape(original),
+                r'(?<=\[)' + re.escape(original) + r'(?=\])',
+                r'\b' + re.escape(original).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') + r'\b'
+            ]
+            
+            for pattern in patterns:
+                regex = re.compile(pattern, re.IGNORECASE)
+                matches = regex.findall(modified_text)
+                counts[original] += len(matches)
+                modified_text = regex.sub(replacement, modified_text)
+        
+        return modified_text, counts
 
     def clean_markdown(self, content: str) -> str:
         """Clean markdown content by removing unnecessary elements."""
@@ -44,44 +73,9 @@ class MarkdownConverter:
         
         return content.strip()
 
-    def convert_docx_to_markdown(self, input_path: Path) -> str:
-        """
-        Convert Word document to Markdown while preserving basic formatting.
-        
-        Args:
-            input_path (Path): Path to the input Word document
-            
-        Returns:
-            str: Converted markdown content
-            
-        Raises:
-            Exception: If conversion fails
-        """
-        try:
-            with open(input_path, 'rb') as docx_file:
-                # Use mammoth for conversion
-                result = mammoth.convert_to_markdown(docx_file)
-                markdown = result.value
-                messages = result.messages
-
-                # Log any conversion warnings or info messages
-                for message in messages:
-                    logging.info(f"Markdown conversion message: {message}")
-
-                # Clean the markdown content before returning
-                cleaned_markdown = self.clean_markdown(markdown)
-                return cleaned_markdown
-
-        except Exception as e:
-            logging.error(f"Error converting to markdown: {str(e)}")
-            raise
-
     def process_markdown(self, markdown_content: str, replacement_dict: Dict[str, str]) -> Tuple[str, Counter]:
         """
         Process markdown content with the given replacement dictionary.
-        
-        Note: Uses ConRed's text replacement functionality to maintain consistency
-        across document types. Imported here to avoid circular imports.
         
         Args:
             markdown_content (str): The markdown text to process
@@ -90,20 +84,23 @@ class MarkdownConverter:
         Returns:
             Tuple[str, Counter]: (Modified markdown content, Count of replacements made)
         """
-        # Import here to avoid circular dependency with ConRed class
-        from conred import ConRed
-        
-        # Clean the markdown content first
-        cleaned_content = self.clean_markdown(markdown_content)
-        
-        # Create temporary ConRed instance for consistent text replacement
-        conred = ConRed()
-        conred.replacement_dict = replacement_dict
-        
-        # Process the cleaned markdown content
-        modified_markdown, counts = conred.replace_text(cleaned_content)
-        
-        # Update our internal counter with the new counts
-        self.replacement_counts.update(counts)
-        
-        return modified_markdown, self.replacement_counts 
+        try:
+            self.set_replacement_dict(replacement_dict)
+            cleaned_content = self.clean_markdown(markdown_content)
+            modified_markdown, counts = self.replace_text(cleaned_content)
+            self.replacement_counts.update(counts)
+            return modified_markdown, self.replacement_counts
+            
+        except Exception as e:
+            logging.error(f"Error processing markdown: {str(e)}")
+            raise 
+
+    def convert_docx_to_markdown(self, docx_path: str) -> str:
+        """Convert a Word document to Markdown format."""
+        try:
+            with open(docx_path, "rb") as docx_file:
+                result = mammoth.convert_to_markdown(docx_file)
+                return result.value
+        except Exception as e:
+            logging.error(f"Error converting DOCX to Markdown: {str(e)}")
+            raise 

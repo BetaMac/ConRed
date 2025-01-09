@@ -20,7 +20,7 @@ hyperframe==5.2.0
 idna==2.10
 joblib==1.4.2
 lxml==5.3.0
-mammoth==1.8.0
+mammoth>=1.6.0
 nltk==3.9.1
 numpy==2.1.2
 openpyxl==3.1.5
