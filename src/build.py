@@ -5,14 +5,22 @@ from pathlib import Path
 # Get the current directory
 current_dir = Path(__file__).parent
 
-# Add any additional files or folders that need to be included
-additional_files = []
+# Create the correct --add-data arguments format for your platform
+def get_add_data_arg(source, dest):
+    # Use semicolon on Windows, colon on other platforms
+    separator = ';' if sys.platform.startswith('win') else ':'
+    return f'--add-data={source}{separator}{dest}'
 
-PyInstaller.__main__.run([
-    str(current_dir / 'conred_gui.py'),  # Full path to your main GUI script
+# Create the PyInstaller command
+args = [
+    str(current_dir / 'conred_gui.py'),  # Main script
     '--name=ConRed',
     '--onefile',
     '--windowed',
-    f'--add-data={str(current_dir / "conred.py")};.',  # Include your original ConRed class
-    *additional_files
-])
+    get_add_data_arg(str(current_dir / 'conred.py'), '.'),
+    get_add_data_arg('config.json', '.'),
+    get_add_data_arg('data/input/*.xml', 'data/input')
+]
+
+# Run PyInstaller
+PyInstaller.__main__.run(args)

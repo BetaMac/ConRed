@@ -7,8 +7,19 @@ import threading
 from typing import List, Tuple, Dict
 import re
 from conred import ConRed
+import logging
 
 class ConRedGUI(ctk.CTk):
+    """
+    Main GUI application for ConRed document processing.
+    
+    Provides interface for:
+    - Loading document pairs
+    - Processing documents with progress tracking
+    - Displaying results and mismatches
+    - Handling multiple document pairs in batch
+    """
+    
     def __init__(self):
         super().__init__()
 
@@ -26,7 +37,35 @@ class ConRedGUI(ctk.CTk):
         self.rules_dir = Path('rules')
         self.rules_dir.mkdir(exist_ok=True)
         
+        # Load default config
+        self.default_config = {
+            'Dynata': 'Panel1',
+            'Toluna': 'Panel2',
+            'Global Market Insite': 'Panel3',
+            'M3': 'Panel4',
+            'SurveyBods': 'Panel5',
+            'St Modwen Homes': 'Client1',
+            'MarketScope Research': 'Agency1',
+            'TechVision Analytics': 'Agency2'
+        }
+        
+        # Try to load existing config or create default
+        config_path = self.rules_dir / 'default_config.json'
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    self.replacements = json.load(f)
+            except Exception as e:
+                self.replacements = self.default_config
+                logging.error(f"Error loading default config: {str(e)}")
+        else:
+            # Save default config
+            with open(config_path, 'w') as f:
+                json.dump(self.default_config, f, indent=4)
+            self.replacements = self.default_config
+        
         self.create_gui()
+        self.update_rules_list()  # Show the loaded rules
 
     def update_status(self, message, progress=None):
         """Update status bar with message and optional progress"""
@@ -36,26 +75,33 @@ class ConRedGUI(ctk.CTk):
         self.update_idletasks()
 
     def add_document_pair(self):
-        """Add a document pair to process"""
-        word_file = filedialog.askopenfilename(
-            filetypes=[("Word Documents", "*.docx;*.doc")]
+        """Add multiple document pairs to process"""
+        word_files = filedialog.askopenfilenames(
+            title="Select Word Documents",
+            filetypes=[
+                ("Word Documents", "*.docx;*.doc"),
+                ("All Files", "*.*")
+            ]
         )
-        if not word_file:
-            return
-            
-        word_path = Path(word_file)
-        xml_path = word_path.with_suffix('.xml')
         
-        if not xml_path.exists():
-            messagebox.showerror(
-                "Error", 
-                f"Corresponding XML file not found: {xml_path}"
-            )
+        if not word_files:
             return
             
-        self.document_pairs.append((word_path, xml_path))
+        for word_file in word_files:
+            word_path = Path(word_file)
+            xml_path = word_path.with_suffix('.xml')
+            
+            if not xml_path.exists():
+                messagebox.showerror(
+                    "Error", 
+                    f"Corresponding XML file not found: {xml_path}"
+                )
+                continue
+                
+            self.document_pairs.append((word_path, xml_path))
+        
         self.update_document_list()
-        self.update_status(f"Added document pair: {word_path.name}")
+        self.update_status(f"Added {len(word_files)} document pair(s)")
 
     def clear_documents(self):
         """Clear all document pairs"""
@@ -140,78 +186,54 @@ class ConRedGUI(ctk.CTk):
         self.search_entry.delete(0, tk.END)
         self.replace_entry.delete(0, tk.END)
 
-    def process_documents(self):
+    def process_files(self):
         """Process all document pairs"""
         if not self.document_pairs:
-            messagebox.showerror("Error", "No document pairs added")
+            messagebox.showwarning("Warning", "No document pairs to process")
             return
             
         if not self.replacements:
-            messagebox.showerror("Error", "No replacement rules defined")
+            messagebox.showwarning("Warning", "No replacement rules defined")
             return
             
-        self.process_btn.configure(state="disabled")
-        self.output_text.delete("1.0", tk.END)
-        self.current_pair = 0
-        self.total_pairs = len(self.document_pairs)
+        # Create ConRed instance with current rules
+        processor = ConRed()
+        processor.replacement_dict = self.replacements
         
-        # Save replacement rules to temporary config
-        config_path = Path('temp_config.json')
-        with open(config_path, 'w') as f:
-            json.dump(self.replacements, f, indent=4)
+        total_pairs = len(self.document_pairs)
+        processed = 0
         
-        def process():
-            conred = ConRed(config_path)
-            
-            for i, (word_path, xml_path) in enumerate(self.document_pairs, 1):
-                self.current_pair = i
-                progress = i / self.total_pairs
+        for word_path, xml_path in self.document_pairs:
+            try:
+                self.update_status(f"Processing {word_path.name}", progress=processed/total_pairs)
+                
+                # Process Word document
+                doc = processor.process_word_document(word_path)
+                output_word = Path('data/output') / word_path.name
+                doc.save(output_word)
+                
+                # Process XML document
+                xml_content = processor.process_xml_document(xml_path)
+                output_xml = Path('data/output') / xml_path.name
+                with open(output_xml, 'w', encoding='utf-8') as f:
+                    f.write(xml_content)
+                    
+                processed += 1
                 self.update_status(
-                    f"Processing pair {i} of {self.total_pairs}: {word_path.name}",
-                    progress
+                    f"Processed {processed}/{total_pairs} pairs", 
+                    progress=processed/total_pairs
                 )
                 
-                self.output_text.insert(tk.END, f"\nProcessing pair:\n{word_path}\n{xml_path}\n")
-                self.output_text.insert(tk.END, "-" * 50 + "\n")
+            except Exception as e:
+                messagebox.showerror(
+                    "Error", 
+                    f"Error processing {word_path.name}: {str(e)}"
+                )
+                logging.error(f"Error processing {word_path}: {str(e)}")
+                return
                 
-                # Create output paths
-                word_output = word_path.parent / 'output' / f'{word_path.stem}_redacted{word_path.suffix}'
-                xml_output = xml_path.parent / 'output' / f'{xml_path.stem}_redacted{xml_path.suffix}'
-                
-                try:
-                    results = conred.process_documents(
-                        word_path, xml_path, word_output, xml_output
-                    )
-                    
-                    if results['mismatches']:
-                        self.output_text.insert(tk.END, "\nWarning: Replacement count mismatches found:\n")
-                        for mismatch in results['mismatches']:
-                            self.output_text.insert(
-                                tk.END,
-                                f"Word '{mismatch['word']}': "
-                                f"Word doc: {mismatch['word_doc_count']}, "
-                                f"XML doc: {mismatch['xml_doc_count']}\n"
-                            )
-                    else:
-                        self.output_text.insert(tk.END, "\nAll replacement counts match!\n")
-                    
-                    self.output_text.insert(tk.END, "\nReplacement counts:\n")
-                    for word, count in results['word_counts'].items():
-                        self.output_text.insert(tk.END, f"{word}: {count} replacements\n")
-                    
-                except Exception as e:
-                    self.output_text.insert(tk.END, f"\nError processing documents: {str(e)}\n")
-                    self.update_status(f"Error processing {word_path.name}", progress)
-                
-                self.output_text.insert(tk.END, "\n" + "="*50 + "\n")
-                self.output_text.see(tk.END)
-            
-            config_path.unlink()  # Remove temporary config file
-            self.process_btn.configure(state="normal")
-            self.update_status("Processing complete!", 1.0)
-        
-        # Run processing in a separate thread
-        threading.Thread(target=process, daemon=True).start()
+        self.update_status("Processing complete!", progress=1.0)
+        messagebox.showinfo("Success", "All documents processed successfully!")
 
     def create_gui(self):
         # Create main containers
@@ -315,7 +337,7 @@ class ConRedGUI(ctk.CTk):
         self.process_btn = ctk.CTkButton(
             self, 
             text="Process Documents", 
-            command=self.process_documents
+            command=self.process_files
         )
         self.process_btn.grid(row=4, column=0, padx=10, pady=10)
 

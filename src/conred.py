@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 import logging
 from datetime import datetime
+from markdown_converter import MarkdownConverter
 
 class ConRed:
     def __init__(self, config_path=None):
@@ -13,7 +14,8 @@ class ConRed:
         Initialize ConRed with optional config file
         """
         self.replacement_dict = {}
-        self.replacement_counts = {'word': {}, 'xml': {}}
+        self.replacement_counts = {'word': {}, 'xml': {}, 'markdown': {}}
+        self.markdown_converter = MarkdownConverter()
         
         # Setup logging
         log_dir = Path('logs')
@@ -39,41 +41,79 @@ class ConRed:
 
     def replace_text(self, text):
         """
-        Perform case-insensitive replacement while preserving replacement text case
+        Perform case-insensitive replacement while preserving replacement text case.
+        Handles markdown-escaped special characters and various markdown formatting patterns.
         Returns tuple of (modified text, counter of replacements)
         """
         counts = Counter()
         modified_text = text
         
         for original, replacement in self.replacement_dict.items():
-            # Create case-insensitive pattern with word boundaries
-            pattern = re.compile(r'\b' + re.escape(original) + r'\b', re.IGNORECASE)
+            # Create patterns for different markdown escape/formatting scenarios
+            patterns = [
+                # Basic word with boundaries
+                r'\b' + re.escape(original) + r'\b',
+                # Markdown escaped characters
+                r'\b' + re.escape(original).replace('.', r'\.').replace('-', r'\-') + r'\b',
+                # Inside markdown formatting (e.g., __text__, **text**)
+                r'(?<=__)\s*' + re.escape(original) + r'\s*(?=__)',
+                r'(?<=\*\*)\s*' + re.escape(original) + r'\s*(?=\*\*)',
+                # After markdown list markers
+                r'(?<=- )' + re.escape(original),
+                r'(?<=\* )' + re.escape(original),
+                # Inside markdown links [text]
+                r'(?<=\[)' + re.escape(original) + r'(?=\])',
+                # With HTML escape sequences
+                r'\b' + re.escape(original).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') + r'\b'
+            ]
             
-            # Count matches before replacement
-            matches = pattern.findall(modified_text)
-            counts[original] = len(matches)
-            
-            # Perform replacement
-            modified_text = pattern.sub(replacement, modified_text)
-            
+            # Apply each pattern
+            for pattern in patterns:
+                regex = re.compile(pattern, re.IGNORECASE)
+                matches = regex.findall(modified_text)
+                counts[original] += len(matches)
+                modified_text = regex.sub(replacement, modified_text)
+        
         return modified_text, counts
 
     def process_word_document(self, input_path):
-        """Process a Word document and count replacements."""
+        """Process a Word document and count replacements while preserving formatting."""
         try:
             doc = docx.Document(input_path)
-            modified_doc = docx.Document()
-            
             self.replacement_counts['word'] = Counter()
             
-            # Process each paragraph
+            # Process all runs in all paragraphs to preserve formatting
             for paragraph in doc.paragraphs:
-                new_text, counts = self.replace_text(paragraph.text)
-                self.replacement_counts['word'].update(counts)
-                modified_doc.add_paragraph(new_text)
+                for run in paragraph.runs:
+                    if run.text:
+                        new_text, counts = self.replace_text(run.text)
+                        self.replacement_counts['word'].update(counts)
+                        run.text = new_text
+            
+            # Process tables
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            for run in paragraph.runs:
+                                if run.text:
+                                    new_text, counts = self.replace_text(run.text)
+                                    self.replacement_counts['word'].update(counts)
+                                    run.text = new_text
+            
+            # Process headers and footers
+            for section in doc.sections:
+                for header in [section.header, section.footer]:
+                    if header:
+                        for paragraph in header.paragraphs:
+                            for run in paragraph.runs:
+                                if run.text:
+                                    new_text, counts = self.replace_text(run.text)
+                                    self.replacement_counts['word'].update(counts)
+                                    run.text = new_text
             
             logging.info(f"Processed Word document: {input_path}")
-            return modified_doc
+            return doc
             
         except Exception as e:
             logging.error(f"Error processing Word document: {str(e)}")
@@ -82,23 +122,18 @@ class ConRed:
     def process_xml_document(self, input_path):
         """Process an XML document and count replacements."""
         try:
-            tree = ET.parse(input_path)
-            root = tree.getroot()
+            # Read the file as text
+            with open(input_path, 'r', encoding='utf-8') as f:
+                content = f.read()
             
             self.replacement_counts['xml'] = Counter()
             
-            def process_element(element):
-                if element.text:
-                    new_text, counts = self.replace_text(element.text)
-                    self.replacement_counts['xml'].update(counts)
-                    element.text = new_text
-                
-                for child in element:
-                    process_element(child)
+            # Do the replacements on the entire content
+            new_content, counts = self.replace_text(content)
+            self.replacement_counts['xml'].update(counts)
             
-            process_element(root)
-            logging.info(f"Processed XML document: {input_path}")
-            return tree
+            # Return the modified content
+            return new_content
             
         except Exception as e:
             logging.error(f"Error processing XML document: {str(e)}")
