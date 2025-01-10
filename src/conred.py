@@ -163,37 +163,59 @@ class ConRed:
 
     def process_documents(self, word_input, xml_input, word_output, xml_output):
         """Process both documents and save results."""
-        # Convert paths to Path objects
-        word_input = Path(word_input)
-        xml_input = Path(xml_input)
-        word_output = Path(word_output)
-        xml_output = Path(xml_output)
-        
-        # Ensure output directories exist
-        word_output.parent.mkdir(parents=True, exist_ok=True)
-        xml_output.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Process documents
-        modified_doc = self.process_word_document(word_input)
-        modified_xml = self.process_xml_document(xml_input)
-        
-        # Save modified documents
-        modified_doc.save(word_output)
-        modified_xml.write(xml_output)
-        
-        # Verify counts and return results
-        mismatches = self.verify_counts()
-        
-        results = {
-            'mismatches': mismatches,
-            'word_counts': dict(self.replacement_counts['word']),
-            'xml_counts': dict(self.replacement_counts['xml'])
-        }
-        
-        # Log results
-        logging.info(f"Processing complete. Mismatches found: {len(mismatches)}")
-        
-        return results
+        try:
+            # Convert paths to Path objects
+            word_input = Path(word_input)
+            xml_input = Path(xml_input)
+            word_output = Path(word_output)
+            xml_output = Path(xml_output)
+            markdown_output = word_output.with_suffix('.md')
+            
+            # Ensure output directories exist
+            word_output.parent.mkdir(parents=True, exist_ok=True)
+            xml_output.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Process documents
+            modified_doc = self.process_word_document(word_input)
+            modified_xml = self.process_xml_document(xml_input)
+            
+            # Convert to markdown and process
+            try:
+                markdown_content = self.markdown_converter.convert_docx_to_markdown(str(word_input))
+                self.markdown_converter.set_replacement_dict(self.replacement_dict)
+                modified_markdown, counts = self.markdown_converter.process_markdown(markdown_content, self.replacement_dict)
+                self.replacement_counts['markdown'] = counts
+                
+                # Save markdown output
+                with open(markdown_output, 'w', encoding='utf-8') as f:
+                    f.write(modified_markdown)
+                logging.info(f"Markdown output saved to {markdown_output}")
+            except Exception as e:
+                logging.error(f"Error during markdown conversion: {str(e)}")
+                self.replacement_counts['markdown'] = Counter()
+            
+            # Save modified documents
+            modified_doc.save(word_output)
+            with open(xml_output, 'w', encoding='utf-8') as f:
+                f.write(modified_xml)
+            
+            # Verify counts and return results
+            mismatches = self.verify_counts()
+            
+            results = {
+                'mismatches': mismatches,
+                'word_counts': dict(self.replacement_counts['word']),
+                'xml_counts': dict(self.replacement_counts['xml']),
+                'markdown_counts': dict(self.replacement_counts['markdown'])
+            }
+            
+            # Log results
+            logging.info(f"Processing complete. Mismatches found: {len(mismatches)}")
+            
+            return results
+        except Exception as e:
+            logging.error(f"Error processing documents: {str(e)}")
+            raise
 
 def main():
     # Example configuration file (config.json)

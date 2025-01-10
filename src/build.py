@@ -32,18 +32,16 @@ args = [
     '--onefile',
     '--windowed',
     '--clean',
+    '--hidden-import=mammoth',
+    '--hidden-import=docx',
+    '--hidden-import=lxml',
+    '--collect-all=mammoth',
+    '--collect-all=docx',
+    '--collect-all=lxml',
     get_add_data_arg(str(current_dir / 'conred.py'), '.'),
     get_add_data_arg(str(current_dir / 'markdown_converter.py'), '.'),
     get_add_data_arg('config.json', '.'),
-    get_add_data_arg('data/input/*.xml', 'data/input'),
-    get_add_data_arg('data/output', 'data/output'),
-    # Add runtime DLLs
-    '--add-binary=C:\\Windows\\System32\\vcruntime140.dll;.',
-    '--add-binary=C:\\Windows\\System32\\vcruntime140_1.dll;.',
-    '--add-binary=C:\\Windows\\System32\\msvcp140.dll;.',
-    '--add-binary=C:\\Windows\\System32\\msvcp140_1.dll;.',
-    '--add-binary=C:\\Windows\\System32\\msvcp140_2.dll;.',
-    '--add-binary=C:\\Windows\\System32\\concrt140.dll;.'
+    get_add_data_arg('data', 'data'),  # Include entire data directory
 ]
 
 # Run PyInstaller

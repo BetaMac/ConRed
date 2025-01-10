@@ -6,6 +6,18 @@ import json
 import threading
 from typing import List, Tuple, Dict
 import re
+import sys
+import os
+
+# Add the current directory to sys.path
+if getattr(sys, 'frozen', False):
+    # If the application is run as a bundle
+    application_path = sys._MEIPASS
+else:
+    # If the application is run from a Python interpreter
+    application_path = os.path.dirname(os.path.abspath(__file__))
+
+sys.path.insert(0, application_path)
 from conred import ConRed
 import logging
 
@@ -210,23 +222,26 @@ class ConRedGUI(ctk.CTk):
             try:
                 self.update_status(f"Processing {word_path.name}", progress=processed/total_pairs)
                 
-                # Process Word document
-                doc = processor.process_word_document(word_path)
+                # Create output paths
                 output_word = Path('data/output') / word_path.name
-                doc.save(output_word)
-                
-                # Process XML document
-                xml_content = processor.process_xml_document(xml_path)
                 output_xml = Path('data/output') / xml_path.name
-                with open(output_xml, 'w', encoding='utf-8') as f:
-                    f.write(xml_content)
+                
+                # Process both documents together
+                results = processor.process_documents(
+                    word_path,
+                    xml_path,
+                    output_word,
+                    output_xml
+                )
                 
                 # Show replacement counts in output
                 self.output_text.insert(tk.END, f"\nProcessed {word_path.name}:\n")
-                for term, count in processor.replacement_counts['word'].items():
+                for term, count in results['word_counts'].items():
                     self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in Word doc\n")
-                for term, count in processor.replacement_counts['xml'].items():
+                for term, count in results['xml_counts'].items():
                     self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in XML\n")
+                for term, count in results['markdown_counts'].items():
+                    self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in Markdown\n")
                 
                 processed += 1
                 self.update_status(
@@ -329,7 +344,7 @@ class ConRedGUI(ctk.CTk):
         
         ctk.CTkLabel(output_frame, text="Processing Output").pack(pady=5)
         
-        self.output_text = ctk.CTkTextbox(output_frame)
+        self.output_text = ctk.CTkTextbox(output_frame, height=100)
         self.output_text.pack(fill="both", expand=True, padx=5, pady=5)
 
         # Status bar
