@@ -37,7 +37,17 @@ class ConRedGUI(ctk.CTk):
 
         # Window setup
         self.title("ConRed - Confidentiality Redactor")
-        self.geometry("800x600")
+        self.geometry("800x800")
+        
+        # Center window at the top of the screen
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        window_width = 800
+        window_height = 800
+        x_position = (screen_width - window_width) // 2
+        y_position = 0  # Position at top of screen
+        
+        self.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
         
         # Data storage
         self.document_pairs: List[Tuple[Path, Path]] = []
@@ -287,7 +297,7 @@ class ConRedGUI(ctk.CTk):
         ).pack(side="left", padx=5)
 
         # Document list
-        self.doc_list = ctk.CTkTextbox(doc_frame, height=100)
+        self.doc_list = ctk.CTkTextbox(doc_frame, height=150)
         self.doc_list.pack(fill="x", padx=5, pady=5)
 
         # Replacement rules section
@@ -335,17 +345,19 @@ class ConRedGUI(ctk.CTk):
         ).pack(side="left", padx=5)
 
         # Rules list
-        self.rules_list = ctk.CTkTextbox(replace_frame, height=100)
+        self.rules_list = ctk.CTkTextbox(replace_frame, height=150)
         self.rules_list.pack(fill="x", padx=5, pady=5)
 
         # Output section
         output_frame = ctk.CTkFrame(self)
         output_frame.grid(row=2, column=0, padx=10, pady=5, sticky="nsew")
+        output_frame.grid_rowconfigure(1, weight=1)
+        output_frame.grid_columnconfigure(0, weight=1)
         
-        ctk.CTkLabel(output_frame, text="Processing Output").pack(pady=5)
+        ctk.CTkLabel(output_frame, text="Processing Output").grid(row=0, column=0, pady=5)
         
-        self.output_text = ctk.CTkTextbox(output_frame, height=100)
-        self.output_text.pack(fill="both", expand=True, padx=5, pady=5)
+        self.output_text = ctk.CTkTextbox(output_frame, height=150)
+        self.output_text.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
 
         # Status bar
         status_frame = ctk.CTkFrame(self)
