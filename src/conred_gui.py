@@ -113,17 +113,17 @@ class ConRedGUI(ctk.CTk):
             word_path = Path(word_file)
             xml_path = word_path.with_suffix('.xml')
             
-            if not xml_path.exists():
-                messagebox.showerror(
-                    "Error", 
-                    f"Corresponding XML file not found: {xml_path}"
+            # Only check for XML if we have replacement rules
+            if self.replacements and not xml_path.exists():
+                messagebox.showwarning(
+                    "Warning", 
+                    f"No XML file found for {word_path.name}. Will only convert to Markdown."
                 )
-                continue
-                
-            self.document_pairs.append((word_path, xml_path))
+            
+            self.document_pairs.append((word_path, xml_path if xml_path.exists() else None))
         
         self.update_document_list()
-        self.update_status(f"Added {len(word_files)} document pair(s)")
+        self.update_status(f"Added {len(word_files)} document(s)")
 
     def clear_documents(self):
         """Clear all document pairs"""
@@ -136,7 +136,12 @@ class ConRedGUI(ctk.CTk):
         """Update the document list display"""
         self.doc_list.delete("1.0", tk.END)
         for word_path, xml_path in self.document_pairs:
-            self.doc_list.insert(tk.END, f"DOCX: {word_path}\nXML: {xml_path}\n\n")
+            self.doc_list.insert(tk.END, f"DOCX: {word_path}\n")
+            if xml_path:
+                self.doc_list.insert(tk.END, f"XML: {xml_path}\n")
+            else:
+                self.doc_list.insert(tk.END, "XML: None (Markdown conversion only)\n")
+            self.doc_list.insert(tk.END, "\n")
 
     def load_rules(self):
         """Load replacement rules from a JSON file"""
@@ -209,13 +214,15 @@ class ConRedGUI(ctk.CTk):
         self.replace_entry.delete(0, tk.END)
 
     def process_files(self):
-        """Process all document pairs"""
+        """Process all documents"""
         if not self.document_pairs:
-            messagebox.showwarning("Warning", "No document pairs to process")
+            messagebox.showwarning("Warning", "No documents to process")
             return
             
-        if not self.replacements:
-            messagebox.showwarning("Warning", "No replacement rules defined")
+        # Only check for replacement rules if we have XML files to process
+        has_xml = any(xml_path for _, xml_path in self.document_pairs)
+        if has_xml and not self.replacements:
+            messagebox.showwarning("Warning", "No replacement rules defined for redaction")
             return
             
         # Clear previous output
@@ -234,28 +241,45 @@ class ConRedGUI(ctk.CTk):
                 
                 # Create output paths
                 output_word = Path('data/output') / word_path.name
-                output_xml = Path('data/output') / xml_path.name
+                output_xml = Path('data/output') / xml_path.name if xml_path else None
                 
-                # Process both documents together
-                results = processor.process_documents(
-                    word_path,
-                    xml_path,
-                    output_word,
-                    output_xml
-                )
-                
-                # Show replacement counts in output
-                self.output_text.insert(tk.END, f"\nProcessed {word_path.name}:\n")
-                for term, count in results['word_counts'].items():
-                    self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in Word doc\n")
-                for term, count in results['xml_counts'].items():
-                    self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in XML\n")
-                for term, count in results['markdown_counts'].items():
-                    self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in Markdown\n")
+                if xml_path:
+                    # Process both documents together
+                    results = processor.process_documents(
+                        word_path,
+                        xml_path,
+                        output_word,
+                        output_xml
+                    )
+                    
+                    # Show replacement counts in output
+                    self.output_text.insert(tk.END, f"\nProcessed {word_path.name}:\n")
+                    for term, count in results['word_counts'].items():
+                        self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in Word doc\n")
+                    for term, count in results['xml_counts'].items():
+                        self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in XML\n")
+                    for term, count in results['markdown_counts'].items():
+                        self.output_text.insert(tk.END, f"- '{term}' replaced {count} times in Markdown\n")
+                else:
+                    # Markdown conversion only
+                    try:
+                        markdown_content = processor.markdown_converter.convert_docx_to_markdown(str(word_path))
+                        markdown_output = Path('data/output') / word_path.with_suffix('.md').name
+                        
+                        # Save markdown output
+                        with open(markdown_output, 'w', encoding='utf-8') as f:
+                            f.write(markdown_content)
+                        
+                        self.output_text.insert(tk.END, f"\nConverted {word_path.name} to Markdown\n")
+                        self.output_text.insert(tk.END, f"Output saved to: {markdown_output}\n")
+                        
+                    except Exception as e:
+                        self.output_text.insert(tk.END, f"Error during markdown conversion: {str(e)}\n")
+                        logging.error(f"Error during markdown conversion: {str(e)}")
                 
                 processed += 1
                 self.update_status(
-                    f"Processed {processed}/{total_pairs} pairs", 
+                    f"Processed {processed}/{total_pairs} documents", 
                     progress=processed/total_pairs
                 )
                 
